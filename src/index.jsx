@@ -73,10 +73,12 @@ const main = async () => {
   const shouldPush = core.getBooleanInput('should_push')
   if (shouldPush) {
     core.startGroup('Commit and push diagram')
-    await exec('git', ['commit', '-m', commitMessage])
+
+    const amendCommit = core.getBooleanInput('amend_commit')
+    await exec('git', amendCommit ? ['commit', '--amend', '-m', commitMessage] : ['commit', '-m', commitMessage])
 
     if (doesBranchExist) {
-      await exec('git', ['push'])
+      await exec('git', amendCommit ? ['push', '--force-with-lease'] : ['push'])
     } else {
       await exec('git', ['push', '--set-upstream', 'origin', branch])
     }

@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "node_modules/.bin/esbuild --target=es2019 ./src/index.jsx --bundle --platform=node --outfile=index.js",
+    "build": "node_modules/.bin/esbuild --target=node20 ./src/index.jsx --bundle --minify --platform=node --outfile=index.js",
     "prepare": "husky install",
     "typecheck": "yarn run tsc --noEmit --allowJs",
     "test:jest": "jest",
@@ -13,7 +13,7 @@
     "@actions/core": "^1.10.0",
     "@actions/exec": "^1.1.0",
     "d3": "^7.0.0",
-    "esbuild": "^0.12.15",
+    "esbuild": "^0.24.2",
     "lodash": "^4.17.21",
     "micromatch": "^4.0.4",
     "react": "^17.0.2",
@@ -26,5 +26,6 @@
     "jest": "^27.0.6",
     "ts-jest": "^27.0.4",
     "typescript": "^4.3.5"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
