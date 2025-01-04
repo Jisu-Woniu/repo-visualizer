@@ -15,15 +15,12 @@ export const getPositionFromAngleAndDistance = (
   angle: number,
   distance: number,
 ): [number, number] => {
-  const radians = angle / 180 * Math.PI;
-  return [
-    Math.cos(radians) * distance,
-    Math.sin(radians) * distance,
-  ];
+  const radians = (angle / 180) * Math.PI;
+  return [Math.cos(radians) * distance, Math.sin(radians) * distance];
 };
 
 export const getAngleFromPosition = (x: number, y: number): number => {
-  return Math.atan2(y, x) * 180 / Math.PI;
+  return (Math.atan2(y, x) * 180) / Math.PI;
 };
 
 export const keepCircleInsideCircle = (
@@ -46,15 +43,12 @@ export const keepCircleInsideCircle = (
     angle < -20 && angle > -100 && isParent ? 13 : 3,
     parentR * 0.2,
   );
-  if (distance > (parentR - childR - padding)) {
+  if (distance > parentR - childR - padding) {
     const diff = getPositionFromAngleAndDistance(
       angle,
       parentR - childR - padding,
     );
-    return [
-      parentPosition[0] + diff[0],
-      parentPosition[1] + diff[1],
-    ];
+    return [parentPosition[0] + diff[0], parentPosition[1] + diff[1]];
   }
   return childPosition;
 };

@@ -5,9 +5,7 @@
 
     "jsx": "react",
     "resolveJsonModule": true,
-    "rootDirs": [
-      "src"
-    ],
+    "rootDirs": ["src"],
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   }

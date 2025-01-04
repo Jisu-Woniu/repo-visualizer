@@ -30,8 +30,7 @@ export const CircleText = ({
         id={id}
         transform={`rotate(${rotate})`}
         style={{ pointerEvents: "none" }}
-      >
-      </path>
+      ></path>
       <text textAnchor="middle" {...props}>
         <textPath href={`#${id}`} startOffset="50%">
           {text}

@@ -1,14 +1,16 @@
 import fs from "fs";
-import * as nodePath from 'path';
-import { shouldExcludePath } from './should-exclude-path';
+import * as nodePath from "path";
+import { shouldExcludePath } from "./should-exclude-path";
 
-
-export const processDir = async (rootPath = "", excludedPaths = [], excludedGlobs = []) => {
-  const foldersToIgnore = [".git", ...excludedPaths]
-  const fullPathFoldersToIgnore = new Set(foldersToIgnore.map((d) =>
-    nodePath.join(rootPath, d)
-  ));
-
+export const processDir = async (
+  rootPath = "",
+  excludedPaths = [],
+  excludedGlobs = [],
+) => {
+  const foldersToIgnore = [".git", ...excludedPaths];
+  const fullPathFoldersToIgnore = new Set(
+    foldersToIgnore.map((d) => nodePath.join(rootPath, d)),
+  );
 
   const getFileStats = async (path = "") => {
     const stats = await fs.statSync(`./${path}`);
@@ -21,10 +23,7 @@ export const processDir = async (rootPath = "", excludedPaths = [], excludedGlob
       size,
     };
   };
-  const addItemToTree = async (
-    path = "",
-    isFolder = true,
-  ) => {
+  const addItemToTree = async (path = "", isFolder = true) => {
     try {
       console.log("Looking in ", `./${path}`);
 
@@ -34,15 +33,14 @@ export const processDir = async (rootPath = "", excludedPaths = [], excludedGlob
 
         for (const fileOrFolder of filesOrFolders) {
           const fullPath = nodePath.join(path, fileOrFolder);
-          if (shouldExcludePath(fullPath, fullPathFoldersToIgnore, excludedGlobs)) {
+          if (
+            shouldExcludePath(fullPath, fullPathFoldersToIgnore, excludedGlobs)
+          ) {
             continue;
           }
 
           const info = fs.statSync(`./${fullPath}`);
-          const stats = await addItemToTree(
-            fullPath,
-            info.isDirectory(),
-          );
+          const stats = await addItemToTree(fullPath, info.isDirectory());
           if (stats) children.push(stats);
         }
 
@@ -55,7 +53,6 @@ export const processDir = async (rootPath = "", excludedPaths = [], excludedGlob
       }
       const stats = getFileStats(path);
       return stats;
-
     } catch (e) {
       console.log("Issue trying to read file", path, e);
       return null;

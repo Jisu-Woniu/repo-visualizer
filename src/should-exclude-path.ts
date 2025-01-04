@@ -7,7 +7,7 @@ import { isMatch } from "micromatch";
 export const shouldExcludePath = (
   path: string,
   pathsToIgnore: Set<string>,
-  globsToIgnore: string[]
+  globsToIgnore: string[],
 ): boolean => {
   if (!path) return false;
 
@@ -18,7 +18,7 @@ export const shouldExcludePath = (
         glob &&
         isMatch(processPath(path), glob, {
           dot: true,
-        })
+        }),
     )
   );
 };
