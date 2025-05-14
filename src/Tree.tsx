@@ -47,7 +47,7 @@ type ProcessedDataItem = {
   x: number;
   y: number;
   parent?: ProcessedDataItem;
-  children: Array<ProcessedDataItem>;
+  children?: ProcessedDataItem[];
 };
 interface FileColors {
   [key: string]: string | undefined;
@@ -177,16 +177,13 @@ export const Tree = ({
           d.children.filter((d) => !d.children?.length).length > 1;
         if (hasChildWithNoChildren) return 5;
         return 13;
-        // const hasChildren = !!d.children?.find((d) => d?.children?.length);
-        // return hasChildren ? 60 : 8;
-        // return [60, 20, 12][d.depth] || 5;
       })(hierarchicalData);
     packedTree.children = reflowSiblings(
       packedTree.children ?? [],
       cachedPositions.current,
       maxDepth,
     );
-    const children = packedTree.descendants() as ProcessedDataItem[];
+    const children = packedTree.descendants();
 
     cachedOrders.current = {};
     cachedPositions.current = {};
@@ -211,8 +208,8 @@ export const Tree = ({
       (d) => fileColors[d.data.extension as string] && d.data.extension,
     ),
   )
-    .sort()
-    .filter((s): s is string => s !== undefined && s.length > 0);
+    .filter((s): s is string => s !== undefined && s.length > 0)
+    .sort();
 
   return (
     <svg
@@ -240,7 +237,7 @@ export const Tree = ({
         if (depth <= 0 || depth > maxDepth) return null;
         const isParent = !!children;
         const runningR = r;
-        // if (depth <= 1 && !children) runningR *= 3;
+
         if (data.path === looseFilesId) return null;
         const isHighlighted = filesChanged.includes(data.path);
         const doHighlight = !!filesChanged.length;
@@ -254,9 +251,6 @@ export const Tree = ({
                   ? "#FCE68A"
                   : "#ECEAEB"
                 : data.color,
-              transition: `transform ${
-                isHighlighted ? "0.5s" : "0s"
-              } ease-out, fill 0.1s ease-out`,
             }}
             transform={`translate(${x}, ${y})`}
           >
@@ -264,7 +258,6 @@ export const Tree = ({
               <>
                 <circle
                   r={r}
-                  style={{ transition: "all 0.5s ease-out" }}
                   stroke="#290819"
                   strokeOpacity="0.2"
                   strokeWidth="1"
@@ -275,7 +268,6 @@ export const Tree = ({
               <circle
                 style={{
                   filter: isHighlighted ? "url(#glow)" : undefined,
-                  transition: "all 0.5s ease-out",
                 }}
                 r={runningR}
                 strokeWidth={null === data.path ? 3 : 0}
@@ -305,13 +297,9 @@ export const Tree = ({
         const fontSize = 16 - depth;
 
         return (
-          <g
-            key={data.path}
-            style={{ pointerEvents: "none", transition: "all 0.5s ease-out" }}
-            transform={`translate(${x}, ${y})`}
-          >
+          <g key={data.path} transform={`translate(${x}, ${y})`}>
             <CircleText
-              style={{ fontSize, transition: "all 0.5s ease-out" }}
+              style={{ fontSize }}
               r={Math.max(20, offsetR - 3)}
               fill="#374151"
               stroke="white"
@@ -320,7 +308,7 @@ export const Tree = ({
               text={label}
             />
             <CircleText
-              style={{ fontSize, transition: "all 0.5s ease-out" }}
+              style={{ fontSize }}
               fill="#374151"
               rotate={depth * 1 - 0}
               r={Math.max(20, offsetR - 3)}
@@ -333,16 +321,15 @@ export const Tree = ({
       {packedData.map(({ x, y, r, depth, data, children }) => {
         if (depth <= 0) return null;
         if (depth > maxDepth) return null;
-        const isParent = !!children;
-        // if (depth <= 1 && !children) runningR *= 3;
+        const isParent = !!children?.length;
         if (data.path === looseFilesId) return null;
         const isHighlighted = filesChanged.includes(data.path);
         const doHighlight = !!filesChanged.length;
-        if (isParent && !isHighlighted) return null;
-        if (null === data.path && !isHighlighted) return null;
-        if (!(isHighlighted || (!doHighlight && r > 22))) {
+        if (
+          !isHighlighted &&
+          (isParent || data.path === null || doHighlight || r <= 22)
+        )
           return null;
-        }
 
         const label = isHighlighted
           ? data.label
@@ -357,17 +344,14 @@ export const Tree = ({
                   ? "#FCE68A"
                   : "#29081916"
                 : data.color,
-              transition: `transform ${isHighlighted ? "0.5s" : "0s"} ease-out`,
             }}
             transform={`translate(${x}, ${y})`}
           >
             <text
               style={{
-                pointerEvents: "none",
                 opacity: 0.9,
                 fontSize: "14px",
                 fontWeight: 500,
-                transition: "all 0.5s ease-out",
               }}
               fill="#4B5563"
               textAnchor="middle"
@@ -380,11 +364,9 @@ export const Tree = ({
             </text>
             <text
               style={{
-                pointerEvents: "none",
                 opacity: 1,
                 fontSize: "14px",
                 fontWeight: 500,
-                transition: "all 0.5s ease-out",
               }}
               textAnchor="middle"
               dominantBaseline="middle"
@@ -393,12 +375,10 @@ export const Tree = ({
             </text>
             <text
               style={{
-                pointerEvents: "none",
                 opacity: 0.9,
                 fontSize: "14px",
                 fontWeight: 500,
                 mixBlendMode: "color-burn",
-                transition: "all 0.5s ease-out",
               }}
               fill="#110101"
               textAnchor="middle"
@@ -519,7 +499,6 @@ const processChild = (
   i: number,
   fileColors: FileColors,
 ): ExtendedFileType => {
-  // if (!child) return;
   const isRoot = !child.path;
   let name = child.name;
   let path = child.path;
@@ -531,7 +510,7 @@ const processChild = (
     const onlyChild = children[0];
     name = `${name}/${onlyChild.name}`;
     path = onlyChild.path;
-    children = onlyChild.children as ExtendedFileType[];
+    children = onlyChild.children ?? [];
   }
   const pathWithoutExtension = path?.split(".").slice(0, -1).join(".");
   const extension = name?.split(".").slice(-1)[0];
@@ -664,7 +643,7 @@ const reflowSiblings = <T extends HierarchyCircularNode<ExtendedFileType>>(
       }
     }
   }
-  // setTimeout(() => simulation.stop(), 100);
+
   const repositionChildren = (d: T, xDiff: number, yDiff: number) => {
     const newD = { ...d };
     newD.x += xDiff;
@@ -705,7 +684,6 @@ const reflowSiblings = <T extends HierarchyCircularNode<ExtendedFileType>>(
               childCachedPosition[1] + itemPositionDiffFromCached[1],
             ];
           } else {
-            // const diff = getPositionFromAngleAndDistance(100, item.r);
             repositionedCachedPositions[child.data.path] = [child.x, child.y];
           }
         }
@@ -732,12 +710,6 @@ const getSortOrder = (
     return -100000000;
   }
   if (item.name === "public") return -1000000;
-  // if (item.depth <= 1 && !item.children) {
-  //   // item.value *= 0.33;
-  //   return item.value  * 100;
-  // }
-  // if (item.depth <= 1) return -10;
 
   return (item.value as number) + -i;
-  // return b.value - a.value;
 };
