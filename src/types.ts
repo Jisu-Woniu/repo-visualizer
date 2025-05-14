@@ -12,7 +12,7 @@ export type CommitType = {
   date: string;
   diff: { added: number; removed: number; modified: number };
 };
-export type FileType = {
+export interface FileType {
   name: string;
   path: string;
   size: number;
@@ -20,4 +20,4 @@ export type FileType = {
   imports?: ImportType[];
   numberOfLines?: number;
   children?: FileType[];
-};
+}

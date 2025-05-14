@@ -1,4 +1,3 @@
-import React, { useMemo, useRef, useState } from "react";
 import {
   extent,
   forceCollide,
@@ -12,22 +11,24 @@ import {
   scaleSqrt,
   timeFormat,
 } from "d3";
-import { FileType } from "./types";
-import countBy from "lodash/countBy";
-import maxBy from "lodash/maxBy";
+import type { ScaleLinear } from "d3";
+import React, { useMemo, useRef, useState } from "react";
+import { keepBetween, keepCircleInsideCircle, truncateString } from "./utils";
+
+import { countBy, uniq } from "lodash";
 import entries from "lodash/entries";
-import uniqBy from "lodash/uniqBy";
 import flatten from "lodash/flatten";
+import maxBy from "lodash/maxBy";
+import { CircleText } from "./CircleText";
 // file colors are from the github/linguist repo
 import defaultFileColors from "./language-colors.json";
-import { CircleText } from "./CircleText";
-import { keepBetween, keepCircleInsideCircle, truncateString } from "./utils";
+import type { FileType } from "./types";
 
 type Props = {
   data: FileType;
-  filesChanged: string[];
+  filesChanged?: string[];
   maxDepth: number;
-  colorEncoding: "type" | "number-of-changes" | "last-change";
+  colorEncoding: string;
   customFileColors?: { [key: string]: string };
 };
 type ExtendedFileType = {
@@ -38,6 +39,7 @@ type ExtendedFileType = {
   value?: number;
   sortOrder?: number;
   fileColors?: { [key: string]: string };
+  children?: ExtendedFileType[];
 } & FileType;
 type ProcessedDataItem = {
   data: ExtendedFileType;
@@ -53,27 +55,33 @@ const looseFilesId = "__structure_loose_file__";
 const width = 1000;
 const height = 1000;
 const maxChildren = 9000;
-const lastCommitAccessor = (d) => new Date(d.commits?.[0]?.date + "0");
-const numberOfCommitsAccessor = (d) => d?.commits?.length || 0;
+const lastCommitAccessor = (d: FileType) =>
+  new Date(d.commits?.[0]?.date).getTime();
+const numberOfCommitsAccessor = (d: FileType) => d?.commits?.length || 0;
 export const Tree = ({
   data,
-  filesChanged = [],
+  filesChanged,
   maxDepth = 9,
   colorEncoding = "type",
   customFileColors,
 }: Props) => {
+  filesChanged = filesChanged || [];
   const fileColors = { ...defaultFileColors, ...customFileColors };
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const cachedPositions = useRef<{ [key: string]: [number, number] }>({});
   const cachedOrders = useRef<{ [key: string]: string[] }>({});
 
   const { colorScale, colorExtent } = useMemo(() => {
-    if (!data) return { colorScale: () => {}, colorExtent: [0, 0] };
-    const flattenTree = (d) => {
-      return d.children ? flatten(d.children.map(flattenTree)) : d;
+    if (!data)
+      return {
+        colorScale: (_v: number) => "",
+        colorExtent: [0, 0] as [number, number],
+      };
+    const flattenTree = (d: FileType): FileType[] => {
+      return d.children ? flatten(d.children.map(flattenTree)) : [d];
     };
     const items = flattenTree(data);
-    // @ts-ignore
+
     const flatTree =
       colorEncoding === "last-change"
         ? items
@@ -84,7 +92,7 @@ export const Tree = ({
             .map(numberOfCommitsAccessor)
             .sort((a, b) => b - a)
             .slice(2, -2);
-    const colorExtent = extent(flatTree);
+    const colorExtent = extent(flatTree) as [number, number];
 
     // const valueScale = scaleLog()
     //   .domain(colorExtent)
@@ -95,38 +103,40 @@ export const Tree = ({
       "#f4f4f4",
       "#f4f4f4",
       "#f4f4f4",
-      // @ts-ignore
       colorEncoding === "last-change" ? "#C7ECEE" : "#FEEAA7",
-      // @ts-ignore
       colorEncoding === "number-of-changes" ? "#3C40C6" : "#823471",
     ];
-    const colorScale = scaleLinear()
+    const colorScale = scaleLinear<string>()
       .domain(
         range(0, colors.length).map(
           (i) =>
-            +colorExtent[0] +
+            colorExtent[0] +
             ((colorExtent[1] - colorExtent[0]) * i) / (colors.length - 1),
         ),
       )
       .range(colors)
       .clamp(true);
     return { colorScale, colorExtent };
-  }, [data]);
+  }, [data, colorEncoding]);
 
-  const getColor = (d) => {
+  const getColor = (d: ExtendedFileType): string | undefined => {
     if (colorEncoding === "type") {
       const isParent = d.children;
       if (isParent) {
         const extensions = countBy(d.children, (c) => c.extension);
-        const mainExtension = maxBy(entries(extensions), ([k, v]) => v)?.[0];
+        const mainExtension = maxBy(entries(extensions), ([_k, v]) => v)?.[0];
         return fileColors[mainExtension] || "#CED6E0";
       }
       return fileColors[d.extension] || "#CED6E0";
-    } else if (colorEncoding === "number-of-changes") {
+    }
+    if (colorEncoding === "number-of-changes") {
       return colorScale(numberOfCommitsAccessor(d)) || "#f4f4f4";
-    } else if (colorEncoding === "last-change") {
+    }
+    if (colorEncoding === "last-change") {
       return colorScale(lastCommitAccessor(d)) || "#f4f4f4";
     }
+
+    return undefined;
   };
 
   const packedData = useMemo(() => {
@@ -151,7 +161,7 @@ export const Tree = ({
         );
       });
 
-    let packedTree = pack()
+    const packedTree = pack()
       .size([width, height * 1.3]) // we'll reflow the tree to be more horizontal, but we want larger bubbles (.pack() sizes the bubbles to fit the space)
       .padding((d) => {
         if (d.depth <= 0) return 0;
@@ -179,17 +189,17 @@ export const Tree = ({
       }
     };
     saveCachedPositionForItem(packedTree);
-    children.forEach((d) => {
+    for (const d of children) {
       cachedPositions.current[d.data.path] = [d.x, d.y];
-    });
+    }
 
     return children.slice(0, maxChildren);
-  }, [data, fileColors]);
+  }, [data, maxDepth]);
 
   const selectedNode =
     selectedNodeId && packedData.find((d) => d.data.path === selectedNodeId);
 
-  const fileTypes = uniqBy(
+  const fileTypes = uniq(
     packedData.map((d) => fileColors[d.data.extension] && d.data.extension),
   )
     .sort()
@@ -206,6 +216,7 @@ export const Tree = ({
       }}
       xmlns="http://www.w3.org/2000/svg"
     >
+      <title>Repo visualizer</title>
       <defs>
         <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="4" result="coloredBlur" />
@@ -221,7 +232,7 @@ export const Tree = ({
         if (depth > maxDepth) return null;
         const isOutOfDepth = depth >= maxDepth;
         const isParent = !!children;
-        let runningR = r;
+        const runningR = r;
         // if (depth <= 1 && !children) runningR *= 3;
         if (data.path === looseFilesId) return null;
         const isHighlighted = filesChanged.includes(data.path);
@@ -283,7 +294,7 @@ export const Tree = ({
           r < 30 ? Math.floor(r / 2.7) + 3 : 100,
         );
 
-        let offsetR = r + 12 - depth * 4;
+        const offsetR = r + 12 - depth * 4;
         const fontSize = 16 - depth;
 
         return (
@@ -407,8 +418,16 @@ export const Tree = ({
 };
 
 const formatD = (d) => (typeof d === "number" ? d : timeFormat("%b %Y")(d));
-const ColorLegend = ({ scale, extent, colorEncoding }) => {
-  if (!scale || !scale.ticks) return null;
+const ColorLegend = ({
+  scale,
+  extent,
+  colorEncoding,
+}: {
+  scale: ((n: number) => string) | ScaleLinear<string, string>;
+  extent: [number, number];
+  colorEncoding: string;
+}) => {
+  if (!scale || !("ticks" in scale)) return null;
   const ticks = scale.ticks(10);
   return (
     <g transform={`translate(${width - 160}, ${height - 90})`}>
@@ -422,14 +441,18 @@ const ColorLegend = ({ scale, extent, colorEncoding }) => {
         {ticks.map((tick, i) => {
           const color = scale(tick);
           return (
-            <stop offset={i / (ticks.length - 1)} stopColor={color} key={i} />
+            <stop
+              offset={i / (ticks.length - 1)}
+              stopColor={color}
+              key={tick}
+            />
           );
         })}
       </linearGradient>
       <rect x="0" width="100" height="13" fill="url(#gradient)" />
       {extent.map((d, i) => (
         <text
-          key={i}
+          key={`${d}`}
           x={i ? 100 : 0}
           y="23"
           fontSize="10"
@@ -442,7 +465,10 @@ const ColorLegend = ({ scale, extent, colorEncoding }) => {
   );
 };
 
-const Legend = ({ fileTypes = [], fileColors }) => {
+const Legend = <C,>({
+  fileTypes = [],
+  fileColors,
+}: { fileTypes: string[]; fileColors: C }) => {
   return (
     <g
       transform={`translate(${width - 60}, ${
@@ -450,7 +476,7 @@ const Legend = ({ fileTypes = [], fileColors }) => {
       })`}
     >
       {fileTypes.map((extension, i) => (
-        <g key={i} transform={`translate(0, ${i * 15})`}>
+        <g key={extension} transform={`translate(0, ${i * 15})`}>
           <circle r="5" fill={fileColors[extension]} />
           <text
             x="10"
@@ -475,12 +501,12 @@ const Legend = ({ fileTypes = [], fileColors }) => {
   );
 };
 
-const processChild = (
+const processChild = <T, U>(
   child: FileType,
-  getColor,
-  cachedOrders,
-  i = 0,
-  fileColors,
+  getColor: (d: ExtendedFileType) => string | undefined,
+  cachedOrders: T,
+  i: number,
+  fileColors: U,
 ): ExtendedFileType => {
   if (!child) return;
   const isRoot = !child.path;
@@ -499,9 +525,9 @@ const processChild = (
   const hasExtension = !!fileColors[extension];
 
   if (isRoot && children) {
-    const looseChildren = children?.filter((d) => !d.children?.length);
+    const looseChildren = children.filter((d) => !d.children?.length);
     children = [
-      ...children?.filter((d) => d.children?.length),
+      ...children.filter((d) => d.children?.length),
       {
         name: looseFilesId,
         path: looseFilesId,
@@ -511,7 +537,7 @@ const processChild = (
     ];
   }
 
-  let extendedChild = {
+  const extendedChild = {
     ...child,
     name,
     path,
@@ -544,28 +570,26 @@ const processChild = (
 
 const reflowSiblings = (
   siblings: ProcessedDataItem[],
-  cachedPositions: Record<string, [number, number]> = {},
+  cachedPositions: Record<string, [number, number]>,
   maxDepth: number,
   parentRadius?: number,
   parentPosition?: [number, number],
 ) => {
   if (!siblings) return;
-  let items = [
-    ...siblings.map((d) => {
-      return {
-        ...d,
-        x: cachedPositions[d.data.path]?.[0] || d.x,
-        y: cachedPositions[d.data.path]?.[1] || d.y,
-        originalX: d.x,
-        originalY: d.y,
-      };
-    }),
+  const items = [
+    ...siblings.map((d) => ({
+      ...d,
+      x: cachedPositions[d.data.path]?.[0] || d.x,
+      y: cachedPositions[d.data.path]?.[1] || d.y,
+      originalX: d.x,
+      originalY: d.y,
+    })),
   ];
   const paddingScale = scaleSqrt()
     .domain([maxDepth, 1])
     .range([3, 8])
     .clamp(true);
-  let simulation = forceSimulation(items)
+  const simulation = forceSimulation(items)
     .force(
       "centerX",
       forceX(width / 2).strength(items[0].depth <= 2 ? 0.01 : 0),
@@ -608,7 +632,7 @@ const reflowSiblings = (
 
   for (let i = 0; i < 280; i++) {
     simulation.tick();
-    items.forEach((d) => {
+    for (const d of items) {
       d.x = keepBetween(d.r, d.x, width - d.r);
       d.y = keepBetween(d.r, d.y, height - d.r);
 
@@ -624,11 +648,11 @@ const reflowSiblings = (
         d.x = containedPosition[0];
         d.y = containedPosition[1];
       }
-    });
+    }
   }
   // setTimeout(() => simulation.stop(), 100);
   const repositionChildren = (d, xDiff, yDiff) => {
-    let newD = { ...d };
+    const newD = { ...d };
     newD.x += xDiff;
     newD.y += yDiff;
     if (newD.children) {
@@ -649,7 +673,7 @@ const reflowSiblings = (
     ];
 
     if (item.children) {
-      let repositionedCachedPositions = { ...cachedPositions };
+      const repositionedCachedPositions = { ...cachedPositions };
       const itemReflowDiff = [item.x - item.originalX, item.y - item.originalY];
 
       item.children = item.children.map((child) =>
@@ -657,7 +681,7 @@ const reflowSiblings = (
       );
       if (item.children.length > 4) {
         if (item.depth > maxDepth) return;
-        item.children.forEach((child) => {
+        for (const child of item.children) {
           // move cached positions with the parent
           const childCachedPosition =
             repositionedCachedPositions[child.data.path];
@@ -670,7 +694,7 @@ const reflowSiblings = (
             // const diff = getPositionFromAngleAndDistance(100, item.r);
             repositionedCachedPositions[child.data.path] = [child.x, child.y];
           }
-        });
+        }
         item.children = reflowSiblings(
           item.children,
           repositionedCachedPositions,

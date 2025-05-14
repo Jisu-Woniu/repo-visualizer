@@ -1,9 +1,6 @@
-export const truncateString = (
-  string: string = "",
-  length: number = 20,
-): string => {
+export const truncateString = (string = "", length = 20): string => {
   return string.length > length + 3
-    ? string.substring(0, length) + "..."
+    ? `${string.substring(0, length)}...`
     : string;
 };
 
@@ -28,11 +25,11 @@ export const keepCircleInsideCircle = (
   parentPosition: [number, number],
   childR: number,
   childPosition: [number, number],
-  isParent: boolean = false,
+  isParent = false,
 ): [number, number] => {
   const distance = Math.sqrt(
-    Math.pow(parentPosition[0] - childPosition[0], 2) +
-      Math.pow(parentPosition[1] - childPosition[1], 2),
+    (parentPosition[0] - childPosition[0]) ** 2 +
+      (parentPosition[1] - childPosition[1]) ** 2,
   );
   const angle = getAngleFromPosition(
     childPosition[0] - parentPosition[0],
