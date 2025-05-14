@@ -1,4 +1,7 @@
+import assert from "node:assert";
 import {
+  type HierarchyCircularNode,
+  type ScaleLinear,
   extent,
   forceCollide,
   forceSimulation,
@@ -11,21 +14,16 @@ import {
   scaleSqrt,
   timeFormat,
 } from "d3";
-import type { ScaleLinear } from "d3";
-import React, { useMemo, useRef, useState } from "react";
-import { keepBetween, keepCircleInsideCircle, truncateString } from "./utils";
-
-import { countBy, uniq } from "lodash";
-import entries from "lodash/entries";
-import flatten from "lodash/flatten";
-import maxBy from "lodash/maxBy";
+import { countBy, entries, flatten, maxBy, uniq } from "lodash";
+import React, { useMemo, useRef } from "react";
 import { CircleText } from "./CircleText";
 // file colors are from the github/linguist repo
 import defaultFileColors from "./language-colors.json";
 import type { FileType } from "./types";
+import { keepBetween, keepCircleInsideCircle, truncateString } from "./utils";
 
 type Props = {
-  data: FileType;
+  data?: FileType;
   filesChanged?: string[];
   maxDepth: number;
   colorEncoding: string;
@@ -48,15 +46,18 @@ type ProcessedDataItem = {
   r: number;
   x: number;
   y: number;
-  parent: ProcessedDataItem | null;
+  parent?: ProcessedDataItem;
   children: Array<ProcessedDataItem>;
 };
+interface FileColors {
+  [key: string]: string | undefined;
+}
 const looseFilesId = "__structure_loose_file__";
 const width = 1000;
 const height = 1000;
 const maxChildren = 9000;
 const lastCommitAccessor = (d: FileType) =>
-  new Date(d.commits?.[0]?.date).getTime();
+  new Date(d.commits?.[0]?.date || 0).getTime();
 const numberOfCommitsAccessor = (d: FileType) => d?.commits?.length || 0;
 export const Tree = ({
   data,
@@ -66,10 +67,15 @@ export const Tree = ({
   customFileColors,
 }: Props) => {
   filesChanged = filesChanged || [];
-  const fileColors = { ...defaultFileColors, ...customFileColors };
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const fileColors: FileColors = useMemo(
+    () => ({
+      ...defaultFileColors,
+      ...customFileColors,
+    }),
+    [customFileColors],
+  );
   const cachedPositions = useRef<{ [key: string]: [number, number] }>({});
-  const cachedOrders = useRef<{ [key: string]: string[] }>({});
+  const cachedOrders = useRef<{ [key: string]: number }>({});
 
   const { colorScale, colorExtent } = useMemo(() => {
     if (!data)
@@ -94,11 +100,6 @@ export const Tree = ({
             .slice(2, -2);
     const colorExtent = extent(flatTree) as [number, number];
 
-    // const valueScale = scaleLog()
-    //   .domain(colorExtent)
-    //   .range([0, 1])
-    //   .clamp(true);
-    // const colorScale = scaleSequential((d) => interpolateBuPu(valueScale(d)));
     const colors = [
       "#f4f4f4",
       "#f4f4f4",
@@ -119,54 +120,59 @@ export const Tree = ({
     return { colorScale, colorExtent };
   }, [data, colorEncoding]);
 
-  const getColor = (d: ExtendedFileType): string | undefined => {
-    if (colorEncoding === "type") {
-      const isParent = d.children;
-      if (isParent) {
-        const extensions = countBy(d.children, (c) => c.extension);
-        const mainExtension = maxBy(entries(extensions), ([_k, v]) => v)?.[0];
-        return fileColors[mainExtension] || "#CED6E0";
-      }
-      return fileColors[d.extension] || "#CED6E0";
-    }
-    if (colorEncoding === "number-of-changes") {
-      return colorScale(numberOfCommitsAccessor(d)) || "#f4f4f4";
-    }
-    if (colorEncoding === "last-change") {
-      return colorScale(lastCommitAccessor(d)) || "#f4f4f4";
-    }
+  const getColor = useMemo(
+    () =>
+      (d: ExtendedFileType): string => {
+        if (colorEncoding === "type") {
+          const isParent = d.children;
+          if (isParent) {
+            const extensions = countBy(d.children, (c) => c.extension);
+            const mainExtension = maxBy(
+              entries(extensions),
+              ([_k, v]) => v,
+            )?.[0];
+            return (
+              (mainExtension ? fileColors[mainExtension] : undefined) ||
+              "#CED6E0"
+            );
+          }
+          return (
+            (d.extension ? fileColors[d.extension] : undefined) || "#CED6E0"
+          );
+        }
+        if (colorEncoding === "number-of-changes") {
+          return colorScale(numberOfCommitsAccessor(d)) || "#f4f4f4";
+        }
+        if (colorEncoding === "last-change") {
+          return colorScale(lastCommitAccessor(d)) || "#f4f4f4";
+        }
 
-    return undefined;
-  };
+        throw new Error(`Invalid color encoding: ${colorEncoding}`);
+      },
+    [colorEncoding, colorScale, fileColors],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies(fileColors): only set once during init
-  // biome-ignore lint/correctness/useExhaustiveDependencies(getColor): only set once during init
   const packedData = useMemo(() => {
     if (!data) return [];
-    const hierarchicalData = hierarchy(
-      processChild(data, getColor, cachedOrders.current, 0, fileColors),
-    )
-      .sum((d) => d.value)
+    const d = processChild(data, getColor, cachedOrders.current, 0, fileColors);
+    assert(d !== undefined, "d !== undefined");
+    const hierarchicalData = hierarchy(d)
+      .sum((d) => d?.value || 0)
       .sort((a, b) => {
-        if (b.data.path.startsWith("src/fonts")) {
-          //   a.data.sortOrder,
-          //   b.data.sortOrder,
-          //   (b.data.sortOrder - a.data.sortOrder) ||
-          //     (b.data.name > a.data.name ? 1 : -1),
-          //   a,
-          //   b,
-          // );
-        }
+        assert(a.data !== undefined, "a.data !== undefined");
+        assert(b.data !== undefined, "b.data !== undefined");
+
         return (
-          b.data.sortOrder - a.data.sortOrder ||
+          (b.data.sortOrder as number) - (a.data.sortOrder as number) ||
           (b.data.name > a.data.name ? 1 : -1)
         );
       });
 
-    const packedTree = pack()
+    const packedTree = pack<ExtendedFileType>()
       .size([width, height * 1.3]) // we'll reflow the tree to be more horizontal, but we want larger bubbles (.pack() sizes the bubbles to fit the space)
       .padding((d) => {
         if (d.depth <= 0) return 0;
+        assert(d.children !== undefined, "d.children !== undefined");
         const hasChildWithNoChildren =
           d.children.filter((d) => !d.children?.length).length > 1;
         if (hasChildWithNoChildren) return 5;
@@ -176,7 +182,7 @@ export const Tree = ({
         // return [60, 20, 12][d.depth] || 5;
       })(hierarchicalData);
     packedTree.children = reflowSiblings(
-      packedTree.children,
+      packedTree.children ?? [],
       cachedPositions.current,
       maxDepth,
     );
@@ -184,8 +190,10 @@ export const Tree = ({
 
     cachedOrders.current = {};
     cachedPositions.current = {};
-    const saveCachedPositionForItem = (item) => {
-      cachedOrders.current[item.data.path] = item.data.sortOrder;
+    const saveCachedPositionForItem = (
+      item: HierarchyCircularNode<ExtendedFileType>,
+    ) => {
+      cachedOrders.current[item.data.path] = item.data.sortOrder as number;
       if (item.children) {
         item.children.forEach(saveCachedPositionForItem);
       }
@@ -196,16 +204,15 @@ export const Tree = ({
     }
 
     return children.slice(0, maxChildren);
-  }, [data, maxDepth]);
-
-  const selectedNode =
-    selectedNodeId && packedData.find((d) => d.data.path === selectedNodeId);
+  }, [data, maxDepth, fileColors, getColor]);
 
   const fileTypes = uniq(
-    packedData.map((d) => fileColors[d.data.extension] && d.data.extension),
+    packedData.map(
+      (d) => fileColors[d.data.extension as string] && d.data.extension,
+    ),
   )
     .sort()
-    .filter(Boolean);
+    .filter((s): s is string => s !== undefined && s.length > 0);
 
   return (
     <svg
@@ -229,10 +236,8 @@ export const Tree = ({
         </filter>
       </defs>
 
-      {packedData.map(({ x, y, r, depth, data, children, ...d }) => {
-        if (depth <= 0) return null;
-        if (depth > maxDepth) return null;
-        const isOutOfDepth = depth >= maxDepth;
+      {packedData.map(({ x, y, r, depth, data, children }) => {
+        if (depth <= 0 || depth > maxDepth) return null;
         const isParent = !!children;
         const runningR = r;
         // if (depth <= 1 && !children) runningR *= 3;
@@ -252,7 +257,6 @@ export const Tree = ({
               transition: `transform ${
                 isHighlighted ? "0.5s" : "0s"
               } ease-out, fill 0.1s ease-out`,
-              // opacity: doHighlight && !isHighlighted ? 0.6 : 1,
             }}
             transform={`translate(${x}, ${y})`}
           >
@@ -274,7 +278,7 @@ export const Tree = ({
                   transition: "all 0.5s ease-out",
                 }}
                 r={runningR}
-                strokeWidth={selectedNodeId === data.path ? 3 : 0}
+                strokeWidth={null === data.path ? 3 : 0}
                 stroke="#374151"
               />
             )}
@@ -288,7 +292,8 @@ export const Tree = ({
         const isParent = !!children && depth !== maxDepth;
         if (!isParent) return null;
         if (data.path === looseFilesId) return null;
-        if (r < 16 && selectedNodeId !== data.path) return null;
+        if (r < 16 && null !== data.path) return null;
+        assert(data.label !== undefined, "data.label !== undefined");
         if (data.label.length > r * 0.5) return null;
 
         const label = truncateString(
@@ -334,8 +339,8 @@ export const Tree = ({
         const isHighlighted = filesChanged.includes(data.path);
         const doHighlight = !!filesChanged.length;
         if (isParent && !isHighlighted) return null;
-        if (selectedNodeId === data.path && !isHighlighted) return null;
-        if (!(isHighlighted || (!doHighlight && !selectedNode && r > 22))) {
+        if (null === data.path && !isHighlighted) return null;
+        if (!(isHighlighted || (!doHighlight && r > 22))) {
           return null;
         }
 
@@ -419,7 +424,8 @@ export const Tree = ({
   );
 };
 
-const formatD = (d) => (typeof d === "number" ? d : timeFormat("%b %Y")(d));
+const formatD = (d: number | Date) =>
+  typeof d === "number" ? d : timeFormat("%b %Y")(d);
 const ColorLegend = ({
   scale,
   extent,
@@ -467,12 +473,12 @@ const ColorLegend = ({
   );
 };
 
-const Legend = <C,>({
+const Legend = ({
   fileTypes = [],
   fileColors,
 }: {
   fileTypes: string[];
-  fileColors: C;
+  fileColors: FileColors;
 }) => {
   return (
     <g
@@ -506,24 +512,26 @@ const Legend = <C,>({
   );
 };
 
-const processChild = <T, U>(
+const processChild = (
   child: FileType,
   getColor: (d: ExtendedFileType) => string | undefined,
-  cachedOrders: T,
+  cachedOrders: { [key: string]: number },
   i: number,
-  fileColors: U,
+  fileColors: FileColors,
 ): ExtendedFileType => {
-  if (!child) return;
+  // if (!child) return;
   const isRoot = !child.path;
   let name = child.name;
   let path = child.path;
-  let children = child?.children?.map((c, i) =>
-    processChild(c, getColor, cachedOrders, i, fileColors),
-  );
+  let children =
+    child.children?.map((c, i) =>
+      processChild(c, getColor, cachedOrders, i, fileColors),
+    ) || [];
   if (children?.length === 1) {
-    name = `${name}/${children[0].name}`;
-    path = children[0].path;
-    children = children[0].children;
+    const onlyChild = children[0];
+    name = `${name}/${onlyChild.name}`;
+    path = onlyChild.path;
+    children = onlyChild.children as ExtendedFileType[];
   }
   const pathWithoutExtension = path?.split(".").slice(0, -1).join(".");
   const extension = name?.split(".").slice(-1)[0];
@@ -532,7 +540,7 @@ const processChild = <T, U>(
   if (isRoot && children) {
     const looseChildren = children.filter((d) => !d.children?.length);
     children = [
-      ...children.filter((d) => d.children?.length),
+      ...children.filter((d) => d?.children?.length),
       {
         name: looseFilesId,
         path: looseFilesId,
@@ -573,14 +581,14 @@ const processChild = <T, U>(
   return extendedChild;
 };
 
-const reflowSiblings = (
-  siblings: ProcessedDataItem[],
+const reflowSiblings = <T extends HierarchyCircularNode<ExtendedFileType>>(
+  siblings: T[],
   cachedPositions: Record<string, [number, number]>,
   maxDepth: number,
   parentRadius?: number,
   parentPosition?: [number, number],
 ) => {
-  if (!siblings) return;
+  if (!siblings) return [];
   const items = [
     ...siblings.map((d) => ({
       ...d,
@@ -613,21 +621,22 @@ const reflowSiblings = (
     )
     .force(
       "x",
-      forceX((d) => cachedPositions[d.data.path]?.[0] || width / 2).strength(
+      forceX<T>((d) => cachedPositions[d.data.path]?.[0] || width / 2).strength(
         (d) =>
           cachedPositions[d.data.path]?.[1] ? 0.5 : (width / height) * 0.3,
       ),
     )
     .force(
       "y",
-      forceY((d) => cachedPositions[d.data.path]?.[1] || height / 2).strength(
-        (d) =>
-          cachedPositions[d.data.path]?.[0] ? 0.5 : (height / width) * 0.3,
+      forceY<T>(
+        (d) => cachedPositions[d.data.path]?.[1] || height / 2,
+      ).strength((d) =>
+        cachedPositions[d.data.path]?.[0] ? 0.5 : (height / width) * 0.3,
       ),
     )
     .force(
       "collide",
-      forceCollide((d) =>
+      forceCollide<T>((d) =>
         d.children ? d.r + paddingScale(d.depth) : d.r + 1.6,
       )
         .iterations(8)
@@ -656,7 +665,7 @@ const reflowSiblings = (
     }
   }
   // setTimeout(() => simulation.stop(), 100);
-  const repositionChildren = (d, xDiff, yDiff) => {
+  const repositionChildren = (d: T, xDiff: number, yDiff: number) => {
     const newD = { ...d };
     newD.x += xDiff;
     newD.y += yDiff;
@@ -713,7 +722,11 @@ const reflowSiblings = (
   return items;
 };
 
-const getSortOrder = (item: ExtendedFileType, cachedOrders, i = 0) => {
+const getSortOrder = (
+  item: ExtendedFileType,
+  cachedOrders: { [key: string]: number },
+  i = 0,
+) => {
   if (cachedOrders[item.path]) return cachedOrders[item.path];
   if (cachedOrders[item.path?.split("/")?.slice(0, -1)?.join("/")]) {
     return -100000000;
@@ -724,6 +737,7 @@ const getSortOrder = (item: ExtendedFileType, cachedOrders, i = 0) => {
   //   return item.value  * 100;
   // }
   // if (item.depth <= 1) return -10;
-  return item.value + -i;
+
+  return (item.value as number) + -i;
   // return b.value - a.value;
 };

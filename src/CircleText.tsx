@@ -1,4 +1,4 @@
-import uniqueId from "lodash/uniqueId";
+import { uniqueId } from "lodash";
 import React, { useMemo, type CSSProperties } from "react";
 
 interface CircleTextProps {

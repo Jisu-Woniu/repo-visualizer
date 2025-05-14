@@ -11,8 +11,8 @@ interface Stats {
 
 export const processDir = async (
   rootPath = "",
-  excludedPaths = [],
-  excludedGlobs = [],
+  excludedPaths: string[] = [],
+  excludedGlobs: string[] = [],
 ) => {
   const foldersToIgnore = [".git", ...excludedPaths];
   const fullPathFoldersToIgnore = new Set(
@@ -33,7 +33,7 @@ export const processDir = async (
   const addItemToTree = async (
     itemPath = "",
     isDirectory = true,
-  ): Promise<Stats> => {
+  ): Promise<Stats | null> => {
     try {
       console.log("Looking in ", `./${itemPath}`);
 

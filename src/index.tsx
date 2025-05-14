@@ -1,11 +1,10 @@
-import * as core from "@actions/core";
-
+import fs from "node:fs/promises";
 import { DefaultArtifactClient } from "@actions/artifact";
+import * as core from "@actions/core";
+import { exec } from "@actions/exec";
 import React from "react";
 import ReactDOMServer from "react-dom/server";
 import { Tree } from "./Tree.js";
-import { exec } from "@actions/exec";
-import fs from "node:fs/promises";
 import { processDir } from "./process-dir";
 
 const main = async () => {
@@ -63,7 +62,7 @@ const main = async () => {
   }
   const componentCodeString = ReactDOMServer.renderToStaticMarkup(
     <Tree
-      data={data}
+      data={data ?? undefined}
       maxDepth={+maxDepth}
       colorEncoding={colorEncoding}
       customFileColors={customFileColors}
