@@ -44,7 +44,7 @@ outputs:
     description: "The diagram contents as text"
 runs:
   using: "node20"
-  main: "index.js"
+  main: "index.cjs"
 branding:
   color: "purple"
   icon: "target"

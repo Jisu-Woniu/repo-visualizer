@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["index.js"]
+    "ignore": ["index.cjs"]
   },
   "formatter": {
     "enabled": true,

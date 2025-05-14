@@ -139,6 +139,8 @@ export const Tree = ({
     return undefined;
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies(fileColors): only set once during init
+  // biome-ignore lint/correctness/useExhaustiveDependencies(getColor): only set once during init
   const packedData = useMemo(() => {
     if (!data) return [];
     const hierarchicalData = hierarchy(
@@ -468,7 +470,10 @@ const ColorLegend = ({
 const Legend = <C,>({
   fileTypes = [],
   fileColors,
-}: { fileTypes: string[]; fileColors: C }) => {
+}: {
+  fileTypes: string[];
+  fileColors: C;
+}) => {
   return (
     <g
       transform={`translate(${width - 60}, ${
