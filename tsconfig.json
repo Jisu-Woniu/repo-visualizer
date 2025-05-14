@@ -5,7 +5,6 @@
 
     "module": "ES2020",
     "moduleResolution": "bundler",
-    "allowJs": true,
     "strict": true,
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.tsbuildinfo",
 
