@@ -1,9 +1,9 @@
-name: JS - Unit Tests
+name: Tests
 
 on: push
 
 jobs:
-  run-tests:
+  unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
 
@@ -21,14 +21,20 @@ jobs:
         run: yarn --frozen-lockfile
 
       - name: Check types
-        run: |
-          yarn run typecheck
+        run: yarn run typecheck
 
       - name: Run unit tests
-        run: |
-          yarn run test
+        run: yarn run test
 
-      - name: Run integrated tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Run integration tests
         uses: ./
         with:
           should_push: false
