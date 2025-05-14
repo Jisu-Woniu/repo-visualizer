@@ -124,7 +124,7 @@ export const Tree = ({
     () =>
       (d: ExtendedFileType): string => {
         if (colorEncoding === "type") {
-          const isParent = d.children;
+          const isParent = d.children?.length;
           if (isParent) {
             const extensions = countBy(d.children, (c) => c.extension);
             const mainExtension = maxBy(
