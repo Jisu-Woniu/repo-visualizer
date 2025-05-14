@@ -29,6 +29,7 @@ type Props = {
   colorEncoding: string;
   customFileColors?: { [key: string]: string };
 };
+
 type ExtendedFileType = {
   extension?: string;
   pathWithoutExtension?: string;
@@ -39,19 +40,11 @@ type ExtendedFileType = {
   fileColors?: { [key: string]: string };
   children?: ExtendedFileType[];
 } & FileType;
-type ProcessedDataItem = {
-  data: ExtendedFileType;
-  depth: number;
-  height: number;
-  r: number;
-  x: number;
-  y: number;
-  parent?: ProcessedDataItem;
-  children?: ProcessedDataItem[];
-};
+
 interface FileColors {
   [key: string]: string | undefined;
 }
+
 const looseFilesId = "__structure_loose_file__";
 const width = 1000;
 const height = 1000;
@@ -59,6 +52,7 @@ const maxChildren = 9000;
 const lastCommitAccessor = (d: FileType) =>
   new Date(d.commits?.[0]?.date || 0).getTime();
 const numberOfCommitsAccessor = (d: FileType) => d?.commits?.length || 0;
+
 export const Tree = ({
   data,
   filesChanged,
@@ -406,6 +400,7 @@ export const Tree = ({
 
 const formatD = (d: number | Date) =>
   typeof d === "number" ? d : timeFormat("%b %Y")(d);
+
 const ColorLegend = ({
   scale,
   extent,
@@ -529,7 +524,7 @@ const processChild = (
     ];
   }
 
-  const extendedChild = {
+  const extendedChild: ExtendedFileType = {
     ...child,
     name,
     path,
@@ -553,7 +548,7 @@ const processChild = (
           )) + i, // stupid hack to stabilize circle order/position
     color: "#fff",
     children,
-  } as ExtendedFileType;
+  };
   extendedChild.color = getColor(extendedChild);
   extendedChild.sortOrder = getSortOrder(extendedChild, cachedOrders, i);
 
