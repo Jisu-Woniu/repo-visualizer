@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import * as path from "node:path";
+import path from "node:path";
 import { shouldExcludePath } from "./should-exclude-path";
 
 interface Stats {
@@ -23,7 +23,7 @@ export const processDir = async (
     const stats = await fs.stat(`./${filePath}`);
     const name = filePath.split("/").filter(Boolean).slice(-1)[0];
     const size = stats.size;
-    const relativePath = filePath.slice(rootPath.length + 1);
+    const relativePath = path.relative(rootPath, filePath);
     return {
       name,
       path: relativePath,

@@ -264,7 +264,7 @@ export const Tree = ({
                   filter: isHighlighted ? "url(#glow)" : undefined,
                 }}
                 r={runningR}
-                strokeWidth={null === data.path ? 3 : 0}
+                strokeWidth={data.path === null ? 3 : 0}
                 stroke="#374151"
               />
             )}
@@ -278,7 +278,7 @@ export const Tree = ({
         const isParent = !!children && depth !== maxDepth;
         if (!isParent) return null;
         if (data.path === looseFilesId) return null;
-        if (r < 16 && null !== data.path) return null;
+        if (r < 16 && data.path !== null) return null;
         assert(data.label !== undefined, "data.label !== undefined");
         if (data.label.length > r * 0.5) return null;
 
@@ -415,7 +415,6 @@ const ColorLegend = ({
   return (
     <g transform={`translate(${width - 160}, ${height - 90})`}>
       <text x={50} y="-5" fontSize="10" textAnchor="middle">
-        {/* @ts-ignore */}
         {colorEncoding === "number-of-changes"
           ? "Number of changes"
           : "Last change date"}
