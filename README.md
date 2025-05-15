@@ -60,6 +60,12 @@ Should be a boolean value, i.e. `true` or `false`. See `commit_message` and `bra
 
 Default: `true`
 
+### `amend_commit`
+
+Whether to amend the last commit with the new diagram. Must be `true` or `false`. This will help make history clean.
+
+Default: `false`
+
 ### `commit_message`
 
 The commit message to use when updating the diagram. Useful for skipping CI. For example: `Updating diagram [skip ci]`
@@ -107,7 +113,6 @@ You'll need to run the `actions/checkout` Action beforehand, to check out the co
     excluded_paths: "dist,node_modules"
 ```
 
-
 ## Accessing the diagram
 
 By default, this action will create a new commit with the diagram on the specified branch.
@@ -119,6 +124,7 @@ action from a later step in your workflow,
 or by using the [GitHub API](https://docs.github.com/en/rest/reference/actions#artifacts).
 
 Example:
+
 ```yaml
 - name: Update diagram
   id: make_diagram
@@ -132,6 +138,7 @@ Example:
     name: "my-diagram"
     path: "downloads"
 ```
+
 In this example, the diagram will be available at downloads/my-diagram.svg
 Note that this will still also create a commit, unless you specify `should_push: false`!
 

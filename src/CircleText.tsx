@@ -1,11 +1,11 @@
-import uniqueId from "lodash/uniqueId";
-import React, { useMemo } from "react";
+import { uniqueId } from "lodash";
+import React, { useMemo, type CSSProperties } from "react";
 
 interface CircleTextProps {
   r: number;
   rotate?: number;
   text: string;
-  style?: any;
+  style?: CSSProperties;
   fill?: string;
   stroke?: string;
   strokeWidth?: string;
@@ -30,7 +30,7 @@ export const CircleText = ({
         id={id}
         transform={`rotate(${rotate})`}
         style={{ pointerEvents: "none" }}
-      ></path>
+      />
       <text textAnchor="middle" {...props}>
         <textPath href={`#${id}`} startOffset="50%">
           {text}

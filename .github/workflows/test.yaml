@@ -1,29 +1,41 @@
-name: JS - Unit Tests
+name: Tests
 
 on: push
 
 jobs:
-
-  run-tests:
+  unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
+          cache: yarn
 
-      - name: Install dependencies with caching
-        uses: bahmutov/npm-install@v1
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
 
       - name: Check types
-        run: |
-          yarn run typecheck
+        run: yarn run typecheck
 
       - name: Run unit tests
-        run: |
-          yarn run test
+        run: yarn run test
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Run integration tests
+        uses: ./
+        with:
+          should_push: false
+          artifact_name: "diagram.svg"
